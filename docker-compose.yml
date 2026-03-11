@@ -1,0 +1,32 @@
+version: "3.8"
+
+services:
+
+  web:
+    build: .
+    container_name: flask_app
+    ports:
+      - "5001:5000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: restaurant
+      DB_USER: postgres
+      DB_PASS: secret
+    depends_on:
+      - db
+    restart: always
+
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: restaurant
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  pgdata:
