@@ -12,7 +12,7 @@ jobs:
     steps:
       # Step 1: Download code
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Step 2: Log in to Docker Hub
       - name: Log in to Docker Hub
@@ -23,7 +23,7 @@ jobs:
 
       # Step 3: Build and push image to Docker Hub
       - name: Build and Push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: true
