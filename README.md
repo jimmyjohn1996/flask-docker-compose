@@ -1,6 +1,6 @@
 # 🍽️ Saffron & Sage — Restaurant Reservation System
 
-A full-stack restaurant reservation system built with Flask and PostgreSQL, containerized with Docker Compose and deployed on AWS.
+A full-stack restaurant reservation system built with Flask and PostgreSQL, containerized with Docker Compose and deployed on AWS with HTTPS.
 
 ---
 
@@ -11,23 +11,23 @@ A full-stack restaurant reservation system built with Flask and PostgreSQL, cont
 ┌─────────────────────────────────────────┐
 │           Docker Compose                │
 │                                         │
-│  ┌─────────────────┐                   │
-│  │   Flask App      │                   │
-│  │   python:3.11    │◄── Browser        │
-│  │   port 5001      │                   │
-│  └────────┬─────────┘                   │
+│  ┌──────────────────┐                  │
+│  │   Flask App       │                  │
+│  │   python:3.11     │◄── Browser       │
+│  │   port 5001       │                  │
+│  └────────┬──────────┘                  │
 │           │ SQL queries                 │
 │           │ DB_HOST=db                  │
-│  ┌────────▼─────────┐                   │
-│  │   PostgreSQL      │                   │
-│  │   postgres:15     │                   │
-│  │   port 5432       │                   │
-│  └────────┬─────────┘                   │
+│  ┌────────▼──────────┐                  │
+│  │   PostgreSQL       │                  │
+│  │   postgres:15      │                  │
+│  │   port 5432        │                  │
+│  └────────┬──────────┘                  │
 │           │                             │
-│  ┌────────▼─────────┐                   │
-│  │   pgdata volume   │                   │
-│  │   (persistent)    │                   │
-│  └──────────────────┘                   │
+│  ┌────────▼──────────┐                  │
+│  │   pgdata volume    │                  │
+│  │   (persistent)     │                  │
+│  └───────────────────┘                  │
 └─────────────────────────────────────────┘
 ```
 
@@ -40,6 +40,7 @@ User                │  ┌─────────────────�
  │                  │  │   AWS ALB                         │   │
  │──── HTTPS ──────►│  │   port 443 (SSL Termination)      │   │
                     │  │   port 80  (redirect to HTTPS)    │   │
+                    │  │   ACM Certificate *.devopsj.com   │   │
                     │  │   Health Check: /health            │   │
                     │  └───────────────┬──────────────────┘   │
                     │                  │ HTTP                   │
@@ -55,9 +56,10 @@ User                │  ┌─────────────────�
                     │  └────────────────┼──────────────────┘   │
                     │                   │ DB_HOST=RDS endpoint  │
                     │  ┌────────────────▼─────────────────┐   │
-                    │  │   AWS RDS (PostgreSQL)             │   │
+                    │  │   AWS RDS (PostgreSQL 15)          │   │
                     │  │   port 5432                        │   │
-                    │  │   Multi-AZ, automated backups      │   │
+                    │  │   Private access only (no public)  │   │
+                    │  │   Automated backups                │   │
                     │  └───────────────────────────────────┘   │
                     └──────────────────────────────────────────┘
 ```
@@ -76,10 +78,13 @@ GitHub Actions
     │
     ├── Build Docker image
     ├── Push to Docker Hub
-    └── Deploy to EC2
+    └── SSH into EC2
             │
-            ▼
-        Live on AWS! 🎉
+            └── Pull new image
+                └── Restart container
+                        │
+                        ▼
+                Live on AWS! 🎉
 ```
 
 ---
@@ -93,8 +98,10 @@ GitHub Actions
 | Docker | Containerization |
 | Docker Compose | Multi-container orchestration |
 | AWS EC2 | Cloud hosting |
-| AWS RDS | Managed database |
-| AWS ALB | Load balancer + HTTPS |
+| AWS RDS (PostgreSQL 15) | Managed database with backups |
+| AWS ALB | Load balancer + HTTPS termination |
+| AWS ACM | Free SSL certificate |
+| AWS Route 53 | DNS — app.devopsj.com |
 | GitHub Actions | CI/CD pipeline |
 
 ---
@@ -115,6 +122,15 @@ http://localhost:5001
 
 ---
 
+## 🌍 Production Deployment
+
+```bash
+# On EC2 — use production compose file (points to RDS)
+docker-compose -f docker-compose.prod.yml up --build -d
+```
+
+---
+
 ## 📁 Project Structure
 
 ```
@@ -124,7 +140,8 @@ flask-docker-compose/
 ├── Dockerfile               # Container configuration
 ├── docker-compose.yml       # Multi-container setup (local)
 ├── docker-compose.prod.yml  # Production config (RDS)
-├── .dockerignore            # Files to exclude
+├── .dockerignore            # Files to exclude from image
+├── .gitignore               # Files to exclude from git
 └── templates/
     └── index.html           # Reservation form UI
 ```
@@ -146,7 +163,7 @@ flask-docker-compose/
 
 | Variable | Default | Description |
 |---|---|---|
-| DB_HOST | db | Database host |
+| DB_HOST | db | Database host (use RDS endpoint in prod) |
 | DB_PORT | 5432 | Database port |
 | DB_NAME | restaurant | Database name |
 | DB_USER | postgres | Database user |
@@ -154,17 +171,21 @@ flask-docker-compose/
 
 ---
 
-## 🌍 Deployment
+## 🔒 Security
 
-### Local (Docker Compose)
-```bash
-docker-compose up --build
-```
+- RDS has **no public access** — only EC2 can connect
+- ALB Security Group allows only HTTP/HTTPS from internet
+- EC2 Security Group allows port 5001 only from ALB
+- Flask runs as **non-root user** inside container
+- Secrets managed via environment variables (never hardcoded)
 
-### Production (AWS EC2 + RDS)
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
+---
+
+## 💰 Cost Note
+
+Infrastructure (EC2 + RDS + ALB) is stopped when not
+in use to avoid unnecessary AWS costs.
+To redeploy — clone repo and follow deployment steps above.
 
 ---
 
@@ -174,7 +195,11 @@ docker-compose -f docker-compose.prod.yml up -d
 - Connecting Flask to PostgreSQL via environment variables
 - Data persistence with Docker named volumes
 - Deploying multi-container apps on AWS EC2
-- Managed databases with AWS RDS
+- Managed databases with AWS RDS (PostgreSQL 15)
+- Private RDS — no public access, EC2 only
 - HTTPS termination with AWS ALB
+- Free SSL certificates with AWS ACM
+- Custom domain with AWS Route 53
 - Production vs development Docker Compose configs
 - CI/CD pipeline with GitHub Actions
+- AWS cost management
